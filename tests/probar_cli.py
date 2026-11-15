@@ -29,10 +29,13 @@ def main():
                 assert campos["doble_version_final"] == "160", campos
                 assert campos["operaciones_realizadas"] == "320", campos
                 assert campos["inconsistencias"] == campos["violaciones_exclusion"] == "0", campos
-                assert campos["correcto"] == campos["r2_ok"] == "SI", campos
+                assert campos["r2_ok"] == "SI", campos
+                assert campos["correcto"] == ("SI" if opcion else "PENDIENTE"), campos
                 assert campos["solicitudes_lectura"] == "240", campos
                 assert campos["solicitudes_escritura"] == "80", campos
                 assert campos["politica_ok"] == ("NA" if opcion else "PENDIENTE"), campos
+                assert campos["traza"] == ("desactivada" if opcion else "pendiente"), campos
+                assert campos["evidencia"] == "NA", campos
                 assert 1 <= int(campos["max_lectoras"]) <= 6, campos
                 assert float(campos["pared_s"]) > 0 and float(campos["cpu_s"]) >= 0, campos
         base = ["cond", "lectores", "1", "1", "1", "0", "0"]

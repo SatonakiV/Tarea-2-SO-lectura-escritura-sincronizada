@@ -464,8 +464,13 @@ void prueba_integracion_pendiente() {
     c.politica = Politica::Escritores;
     rechaza([&] { crear_control(c); });
     MonitorRW monitor(Politica::Lectores);
-    exigir(verificar_politica(monitor, Politica::Lectores, true).estado == EstadoPolitica::Pendiente, "verificador ficticio");
-    exigir(verificar_politica(monitor, Politica::Lectores, false).estado == EstadoPolitica::Desactivada, "notraza");
+    for (const bool traza : {true, false}) {
+        const auto resultado = verificar_politica(monitor, Politica::Lectores, traza);
+        exigir(resultado.estado == (traza ? EstadoPolitica::Pendiente : EstadoPolitica::Desactivada),
+               "estado del verificador pendiente/notraza");
+        exigir(resultado.evidencia == 0 && resultado.indice == 0 && resultado.regla_incumplida.empty(),
+               "verificador pendiente inventa evidencia o una infraccion");
+    }
 }
 }
 

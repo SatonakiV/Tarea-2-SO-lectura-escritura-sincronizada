@@ -1,12 +1,17 @@
 #pragma once
 #include "configuracion.hpp"
 #include "control_rw.hpp"
+#include <cstddef>
 #include <memory>
+#include <string>
 
 enum class EstadoPolitica { Pendiente, Desactivada, Correcta, Incorrecta };
 struct ResultadoPolitica {
     EstadoPolitica estado = EstadoPolitica::Pendiente;
     long evidencia = 0;
+    // Solo significativos si estado == Incorrecta; indice cuenta desde cero.
+    std::size_t indice = 0;
+    std::string regla_incumplida{};
 };
 
 // P2 mantiene estas dos funciones en integracion_monitor.cpp. La segunda se

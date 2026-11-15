@@ -47,7 +47,15 @@ Ejemplos:
 
 El programa imprime un resumen con las operaciones, valores finales del registro,
 comprobaciones y métricas de tiempo y concurrencia. Los errores se escriben en la
-salida de error. El código de salida es 0 si la ejecución termina correctamente y
+salida de error. `r2_ok` indica si pasan las comprobaciones del registro, la carga
+y la exclusión. Si pasan pero la verificación de política está pendiente, se muestra
+`correcto=PENDIENTE`; cualquier fallo detectado produce `correcto=NO`. Una política
+verificada sin errores permite `correcto=SI`. Con `notraza` (o en modo `atomic`),
+`politica_ok=NA` y `correcto` refleja solo las comprobaciones de ejecución.
+Los errores de política incluyen en la salida de error el índice de la anotación
+(desde cero) y la regla incumplida.
+El código de salida es 0 si la ejecución termina sin fallos detectados, incluso
+si la verificación de política está pendiente, y
 1 si hay argumentos inválidos, una selección no disponible o un fallo de ejecución.
 
 ## Probar

@@ -16,7 +16,10 @@ int main(int argc, char* argv[]) {
         const auto politica = c.modo == Modo::Cond
             ? verificar_politica(*control, c.politica, c.traza)
             : ResultadoPolitica{EstadoPolitica::Desactivada, 0};
-        const bool correcto = r.correcto(c) && politica.estado != EstadoPolitica::Incorrecta;
+        const bool r2_ok = r.correcto(c);
+        const bool sin_fallos = r2_ok && politica.estado != EstadoPolitica::Incorrecta;
+        const char* correcto = !sin_fallos ? "NO"
+            : politica.estado == EstadoPolitica::Pendiente ? "PENDIENTE" : "SI";
         std::cout << std::fixed << std::setprecision(6)
             << "modo=" << nombre(c.modo) << " politica=" << nombre(c.politica)
             << " L=" << c.lectores << " E=" << c.escritores << " K=" << c.operaciones
@@ -42,8 +45,8 @@ int main(int argc, char* argv[]) {
             << " fallos_escritoras_esperando=" << r.fallos.escritoras_esperando
             << " fallos_cas=" << r.fallos.cas_fallido
             << " fallos_saturados=" << (r.fallos.saturado ? "SI" : "NO") << '\n'
-            << "r2_ok=" << (r.correcto(c) ? "SI" : "NO")
-            << " correcto=" << (correcto ? "SI" : "NO");
+            << "r2_ok=" << (r2_ok ? "SI" : "NO")
+            << " correcto=" << correcto;
         switch (politica.estado) {
         case EstadoPolitica::Correcta: std::cout << " traza=activa politica_ok=SI evidencia=" << politica.evidencia; break;
         case EstadoPolitica::Incorrecta: std::cout << " traza=activa politica_ok=NO evidencia=" << politica.evidencia; break;
@@ -52,7 +55,11 @@ int main(int argc, char* argv[]) {
         }
         std::cout << '\n';
         for (const auto& error : r.errores) std::cerr << "Error: " << error << '\n';
-        return correcto ? 0 : 1;
+        if (politica.estado == EstadoPolitica::Incorrecta) {
+            std::cerr << "Error de politica en anotacion " << politica.indice
+                      << " (indice desde cero): " << politica.regla_incumplida << '\n';
+        }
+        return sin_fallos ? 0 : 1;
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << '\n' << "Uso: " << uso() << '\n';
         return 1;
