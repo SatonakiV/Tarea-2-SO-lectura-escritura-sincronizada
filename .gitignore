@@ -1,0 +1,12 @@
+# Documentos, planificacion y archivos auxiliares de uso local.
+/material-local/
+/docs/
+/rw
+/rw.exe
+/rw_tests
+/rw_tests.exe
+/rw_tests_tsan
+/rw_tests_tsan.exe
+/build/
+*.o
+__pycache__/
