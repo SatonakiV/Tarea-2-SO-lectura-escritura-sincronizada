@@ -10,7 +10,8 @@ TEST_TIMEOUT ?= 60s
 # P2/P3: añadir aquí los nuevos .cpp de sus módulos; nunca agregar otro main().
 CORE_SOURCES = src/configuracion.cpp src/monitor_rw.cpp src/metricas.cpp \
                src/ejecucion.cpp src/fabrica.cpp src/integracion_monitor.cpp \
-               src/integracion_atomico.cpp src/control_atomico_rw.cpp
+               src/integracion_atomico.cpp src/control_atomico_rw.cpp \
+               src/verificador.cpp
 HEADERS = $(wildcard include/*.hpp)
 
 .PHONY: all test test-tsan clean
@@ -22,8 +23,12 @@ rw: src/rw.cpp $(CORE_SOURCES) $(HEADERS)
 rw_tests: tests/pruebas.cpp $(CORE_SOURCES) $(HEADERS)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/pruebas.cpp $(CORE_SOURCES) $(LDFLAGS) $(LDLIBS) -o $@
 
-test: rw rw_tests
+rw_verificador_tests: tests/test_verificador.cpp src/verificador.cpp $(HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/test_verificador.cpp src/verificador.cpp $(LDFLAGS) $(LDLIBS) -o $@
+
+test: rw rw_tests rw_verificador_tests
 	timeout --kill-after=5s $(TEST_TIMEOUT) ./rw_tests
+	timeout --kill-after=5s $(TEST_TIMEOUT) ./rw_verificador_tests
 	timeout --kill-after=5s $(TEST_TIMEOUT) python3 tests/probar_cli.py ./rw
 
 # Ejecutable separado: no reutilizar un binario previamente compilado sin TSan.
@@ -32,4 +37,4 @@ test-tsan: tests/pruebas.cpp $(CORE_SOURCES) $(HEADERS)
 	timeout --kill-after=5s $(TEST_TIMEOUT) $(TSAN_RUNNER) ./rw_tests_tsan
 
 clean:
-	$(RM) rw rw_tests rw_tests_tsan rw.exe rw_tests.exe rw_tests_tsan.exe
+	$(RM) rw rw_tests rw_verificador_tests rw_tests_tsan rw.exe rw_tests.exe rw_verificador_tests.exe rw_tests_tsan.exe
