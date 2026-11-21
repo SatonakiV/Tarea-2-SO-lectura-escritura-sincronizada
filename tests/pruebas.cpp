@@ -1,9 +1,11 @@
 #include "configuracion.hpp"
+#include "control_atomico_rw.hpp"
 #include "ejecucion.hpp"
 #include "integraciones.hpp"
 #include "intervalo_admitido.hpp"
 #include "monitor_rw.hpp"
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <functional>
@@ -12,6 +14,7 @@
 #include <mutex>
 #include <stdexcept>
 #include <system_error>
+#include <thread>
 #include <utility>
 
 namespace {
@@ -456,13 +459,170 @@ void prueba_contencion_sin_pausas() {
     }
 }
 
+// Espera de la prueba (no del protocolo) con límite de 5 s.
+template<class F> bool esperar_hasta(F condicion) {
+    const auto limite = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (!condicion()) {
+        if (std::chrono::steady_clock::now() > limite) return false;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    return true;
+}
+
+void prueba_atomico_formato() {
+    using C = ControlAtomicoRW;
+    exigir((C::MASCARA_LECTORAS & C::ESCRITORA_ACTIVA) == 0 &&
+           (C::MASCARA_LECTORAS & C::MASCARA_ESPERANDO) == 0 &&
+           (C::ESCRITORA_ACTIVA & C::MASCARA_ESPERANDO) == 0, "campos superpuestos");
+    // Peor caso de R1: 999 en cada contador (L + E <= 1000).
+    const auto e = C::decodificar(999 * C::UNA_LECTORA + C::ESCRITORA_ACTIVA + 999 * C::UNA_ESPERANDO);
+    exigir(e.lectoras_activas == 999 && e.escritora_activa && e.escritoras_esperando == 999,
+           "un campo se desborda con L + E <= 1000");
+    const auto vacio = C().observar();
+    exigir(vacio.lectoras_activas == 0 && !vacio.escritora_activa && vacio.escritoras_esperando == 0,
+           "estado inicial");
+}
+
+void prueba_atomico_lectoras_concurrentes() {
+    ControlAtomicoRW control;
+    std::atomic<bool> dentro1{false}, dentro2{false}, soltar{false};
+    auto leer = [&](std::atomic<bool>& dentro) {
+        control.entrar_lectura();
+        dentro = true;
+        while (!soltar) std::this_thread::yield();
+        control.salir_lectura();
+    };
+    std::thread l1(leer, std::ref(dentro1));
+    bool ok = esperar_hasta([&] { return dentro1.load(); });
+    std::thread l2(leer, std::ref(dentro2));
+    ok = esperar_hasta([&] { return dentro2.load(); }) && ok;
+    const auto e = control.observar();
+    soltar = true;
+    l1.join(); l2.join();
+    exigir(ok && e.lectoras_activas == 2 && !e.escritora_activa, "lectoras serializadas");
+    exigir(control.observar().lectoras_activas == 0, "lectoras no salieron");
+}
+
+void prueba_atomico_prioridad_escritores() {
+    ControlAtomicoRW control;
+    std::atomic<int> orden{0};
+    std::atomic<int> orden_esc{-1}, orden_lec{-1};
+    std::atomic<bool> lectora0_dentro{false}, soltar0{false}, soltar_esc{false};
+    FallosAdmision fallos_esc, fallos_lec;
+    std::thread lectora0([&] {
+        control.entrar_lectura();
+        lectora0_dentro = true;
+        while (!soltar0) std::this_thread::yield();
+        control.salir_lectura();
+    });
+    bool ok = esperar_hasta([&] { return lectora0_dentro.load(); });
+    std::thread escritora([&] {
+        fallos_hebra = {};
+        control.entrar_escritura();
+        orden_esc = orden++;
+        while (!soltar_esc) std::this_thread::yield();
+        control.salir_escritura();
+        fallos_esc = fallos_hebra;
+    });
+    ok = esperar_hasta([&] { return control.observar().escritoras_esperando == 1; }) && ok;
+    // Lectora nueva con una escritora esperando y otra lectora dentro.
+    std::thread lectora1([&] {
+        fallos_hebra = {};
+        control.entrar_lectura();
+        orden_lec = orden++;
+        control.salir_lectura();
+        fallos_lec = fallos_hebra;
+    });
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    const bool lectora_bloqueada = orden_lec == -1 && control.observar().lectoras_activas == 1;
+    soltar0 = true;
+    ok = esperar_hasta([&] { return orden_esc.load() != -1; }) && ok;
+    const auto e = control.observar();
+    soltar_esc = true;
+    lectora0.join(); escritora.join(); lectora1.join();
+    exigir(ok && lectora_bloqueada, "una lectora nueva entro con una escritora esperando");
+    exigir(e.escritora_activa && e.lectoras_activas == 0 && e.escritoras_esperando == 0,
+           "el CAS de admision no descuenta la espera ni marca la escritora");
+    exigir(orden_esc < orden_lec, "la lectora adelanto a la escritora esperando");
+    exigir(fallos_esc.recurso_ocupado > 0, "escritora sin fallos por lectoras activas");
+    exigir(fallos_lec.escritoras_esperando > 0, "lectora sin fallos por escritoras esperando");
+    exigir(fallos_lec.recurso_ocupado + fallos_lec.escritoras_esperando + fallos_lec.cas_fallido > 0 &&
+           !fallos_esc.saturado && !fallos_lec.saturado, "contadores de fallos");
+    std::cout << "  lectora: ocupado=" << fallos_lec.recurso_ocupado
+              << " esperando=" << fallos_lec.escritoras_esperando << " cas=" << fallos_lec.cas_fallido
+              << "; escritora: ocupado=" << fallos_esc.recurso_ocupado << " cas=" << fallos_esc.cas_fallido << '\n';
+}
+
+void prueba_atomico_exclusion_escritoras() {
+    ControlAtomicoRW control;
+    std::atomic<int> orden{0};
+    std::atomic<int> orden_esc{-1}, orden_lec{-1};
+    control.entrar_escritura(); // esta hebra es la escritora activa
+    std::thread escritora([&] {
+        control.entrar_escritura();
+        orden_esc = orden++;
+        control.salir_escritura();
+    });
+    bool ok = esperar_hasta([&] { return control.observar().escritoras_esperando == 1; });
+    std::thread lectora([&] {
+        control.entrar_lectura();
+        orden_lec = orden++;
+        control.salir_lectura();
+    });
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    const auto e = control.observar();
+    const bool bloqueadas = orden_esc == -1 && orden_lec == -1;
+    control.salir_escritura();
+    escritora.join(); lectora.join();
+    exigir(ok && bloqueadas && e.escritora_activa && e.lectoras_activas == 0,
+           "otra hebra entro con una escritora activa");
+    exigir(orden_esc < orden_lec, "la lectora adelanto a la escritora esperando");
+    const auto fin = control.observar();
+    exigir(fin.lectoras_activas == 0 && !fin.escritora_activa && fin.escritoras_esperando == 0,
+           "estado final no vacio");
+}
+
+void prueba_atomico_casos_e1() {
+    struct Caso { long l, e, k, lec, esc; };
+    const Caso casos[] = {{1, 1, 20, 500, 500}, {6, 2, 100, 200, 500}, {2, 6, 100, 500, 200},
+                          {8, 8, 100, 0, 0}, {8, 1, 200, 1000, 100}, {8, 8, 2000, 0, 0}};
+    for (const auto& caso : casos) {
+        Configuracion c;
+        c.modo = Modo::Atomic;
+        c.politica = Politica::Escritores;
+        c.lectores = caso.l;
+        c.escritores = caso.e;
+        c.operaciones = caso.k;
+        c.dur_lec_us = caso.lec;
+        c.dur_esc_us = caso.esc;
+        c.traza = false;
+        auto control = crear_control(c);
+        const auto r = ejecutar(c, *control);
+        exigir(r.correcto(c), "atomico: invariantes R2 o valores finales incorrectos");
+        exigir(r.registro.version == c.escritores * c.operaciones &&
+               r.registro.doble_version == 2 * c.escritores * c.operaciones, "atomico: registro final");
+        exigir(r.max_lectoras >= 1 && r.max_lectoras <= c.lectores, "atomico: maximo de lectoras");
+        exigir(!r.fallos.saturado, "atomico: contadores saturados");
+        // Con varias lectoras y pausas, la prioridad de escritores tiene que actuar.
+        if (c.lectores > 1 && c.dur_esc_us > 0) {
+            exigir(r.fallos.escritoras_esperando > 0, "atomico: sin evidencia de prioridad de escritores");
+        }
+        std::cout << "  atomic L=" << c.lectores << " E=" << c.escritores << " K=" << c.operaciones
+                  << " version=" << r.registro.version << " max_lectoras=" << r.max_lectoras
+                  << " ocupado=" << r.fallos.recurso_ocupado
+                  << " esperando=" << r.fallos.escritoras_esperando
+                  << " cas=" << r.fallos.cas_fallido << '\n';
+    }
+}
+
 void prueba_integracion_pendiente() {
     Configuracion c;
     c.politica = Politica::Fifo;
     rechaza([&] { crear_control(c); });
     c.modo = Modo::Atomic;
     c.politica = Politica::Escritores;
-    rechaza([&] { crear_control(c); });
+    exigir(dynamic_cast<ControlAtomicoRW*>(crear_control(c).get()) != nullptr,
+           "modo atomic no crea ControlAtomicoRW");
     MonitorRW monitor(Politica::Lectores);
     for (const bool traza : {true, false}) {
         const auto resultado = verificar_politica(monitor, Politica::Lectores, traza);
@@ -486,7 +646,12 @@ int main() {
         {"error dentro de una hebra", prueba_error_hebra},
         {"excepcion durante lectura y escritura admitidas", prueba_error_dentro_del_intervalo},
         {"contencion sin pausas en ambas politicas", prueba_contencion_sin_pausas},
-        {"integraciones pendientes explicitas", prueba_integracion_pendiente}
+        {"atomico: formato de la palabra", prueba_atomico_formato},
+        {"atomico: lectoras concurrentes", prueba_atomico_lectoras_concurrentes},
+        {"atomico: prioridad de escritores", prueba_atomico_prioridad_escritores},
+        {"atomico: exclusion de escritoras", prueba_atomico_exclusion_escritoras},
+        {"atomico: casos E1 e invariantes R2", prueba_atomico_casos_e1},
+        {"integraciones y pendientes explicitas", prueba_integracion_pendiente}
     };
     int fallos = 0;
     for (const auto& prueba : pruebas) {

@@ -43,7 +43,12 @@ Ejemplos:
 ./rw cond lectores 6 2 100 200 500
 ./rw cond escritores 6 2 100 200 500
 ./rw cond escritores 8 8 10000 0 0 notraza
+./rw atomic escritores 6 2 100 200 500
 ```
+
+En modo `atomic`, las hebras que no pueden entrar esperan activamente y el
+resumen informa los intentos fallidos por causa: `fallos_recurso_ocupado`,
+`fallos_escritoras_esperando` y `fallos_cas`.
 
 El programa imprime un resumen con las operaciones, valores finales del registro,
 comprobaciones y métricas de tiempo y concurrencia. Los errores se escriben en la

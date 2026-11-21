@@ -38,6 +38,20 @@ def main():
                 assert campos["evidencia"] == "NA", campos
                 assert 1 <= int(campos["max_lectoras"]) <= 6, campos
                 assert float(campos["pared_s"]) > 0 and float(campos["cpu_s"]) >= 0, campos
+        for caso, version in ((["6", "2", "40", "100", "150"], 80),
+                              (["1", "1", "1", "0", "0"], 1)):
+            for opcion in ([], ["notraza"]):
+                campos = ejecutar(["atomic", "escritores", *caso, *opcion], 0)
+                assert campos["version_final"] == str(version), campos
+                assert campos["doble_version_final"] == str(2 * version), campos
+                assert campos["inconsistencias"] == campos["violaciones_exclusion"] == "0", campos
+                assert campos["r2_ok"] == campos["correcto"] == "SI", campos
+                assert campos["fallos_aplican"] == "SI", campos
+                assert campos["fallos_saturados"] == "NO", campos
+                assert campos["politica_ok"] == "NA" and campos["traza"] == "desactivada", campos
+                for causa in ("fallos_recurso_ocupado", "fallos_escritoras_esperando", "fallos_cas"):
+                    assert int(campos[causa]) >= 0, campos
+        ejecuciones = len(registros)
         base = ["cond", "lectores", "1", "1", "1", "0", "0"]
         invalidos = [[], base + ["extra"], base + ["notraza", "extra"]]
         for indice, valor in ((0, "otro"), (1, "otra"), (2, "0"), (3, "0"),
@@ -50,11 +64,10 @@ def main():
         invalidos += [["cond", "lectores", "999", "2", "1", "0", "0"],
                       ["atomic", "lectores", "1", "1", "1", "0", "0"],
                       ["atomic", "fifo", "1", "1", "1", "0", "0"],
-                      ["atomic", "escritores", "1", "1", "1", "0", "0"],
                       ["cond", "fifo", "1", "1", "1", "0", "0"]]
         for caso in invalidos:
             ejecutar(caso, 1)
-        print(f"CLI: {len(registros)} casos OK (4 ejecuciones y {len(invalidos)} rechazos)")
+        print(f"CLI: {len(registros)} casos OK ({ejecuciones} ejecuciones y {len(invalidos)} rechazos)")
     finally:
         if args.registro:
             args.registro.parent.mkdir(parents=True, exist_ok=True)

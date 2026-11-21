@@ -10,7 +10,7 @@ TEST_TIMEOUT ?= 60s
 # P2/P3: añadir aquí los nuevos .cpp de sus módulos; nunca agregar otro main().
 CORE_SOURCES = src/configuracion.cpp src/monitor_rw.cpp src/metricas.cpp \
                src/ejecucion.cpp src/fabrica.cpp src/integracion_monitor.cpp \
-               src/integracion_atomico.cpp
+               src/integracion_atomico.cpp src/control_atomico_rw.cpp
 HEADERS = $(wildcard include/*.hpp)
 
 .PHONY: all test test-tsan clean
