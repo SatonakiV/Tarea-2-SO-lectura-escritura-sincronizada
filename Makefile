@@ -26,9 +26,13 @@ rw_tests: tests/pruebas.cpp $(CORE_SOURCES) $(HEADERS)
 rw_verificador_tests: tests/test_verificador.cpp src/verificador.cpp $(HEADERS)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/test_verificador.cpp src/verificador.cpp $(LDFLAGS) $(LDLIBS) -o $@
 
-test: rw rw_tests rw_verificador_tests
+rw_fifo_tests: tests/test_fifo.cpp src/monitor_rw.cpp src/verificador.cpp src/integracion_monitor.cpp $(HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/test_fifo.cpp src/monitor_rw.cpp src/verificador.cpp src/integracion_monitor.cpp $(LDFLAGS) $(LDLIBS) -o $@
+
+test: rw rw_tests rw_verificador_tests rw_fifo_tests
 	timeout --kill-after=5s $(TEST_TIMEOUT) ./rw_tests
 	timeout --kill-after=5s $(TEST_TIMEOUT) ./rw_verificador_tests
+	timeout --kill-after=5s $(TEST_TIMEOUT) ./rw_fifo_tests
 	timeout --kill-after=5s $(TEST_TIMEOUT) python3 tests/probar_cli.py ./rw
 
 # Ejecutable separado: no reutilizar un binario previamente compilado sin TSan.
@@ -37,4 +41,4 @@ test-tsan: tests/pruebas.cpp $(CORE_SOURCES) $(HEADERS)
 	timeout --kill-after=5s $(TEST_TIMEOUT) $(TSAN_RUNNER) ./rw_tests_tsan
 
 clean:
-	$(RM) rw rw_tests rw_verificador_tests rw_tests_tsan rw.exe rw_tests.exe rw_verificador_tests.exe rw_tests_tsan.exe
+	$(RM) rw rw_tests rw_verificador_tests rw_fifo_tests rw_tests_tsan rw.exe rw_tests.exe rw_verificador_tests.exe rw_fifo_tests.exe rw_tests_tsan.exe

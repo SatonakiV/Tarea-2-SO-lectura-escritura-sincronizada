@@ -29,6 +29,7 @@ struct ResultadoVerificacion {
     bool valida = true;
     std::size_t indice = 0;
     std::string error;
+    long evidencia = 0;
 };
 
 bool aplicar_evento(
@@ -39,4 +40,9 @@ bool aplicar_evento(
 
 ResultadoVerificacion verificar_traza(
     const std::vector<AnotacionTraza>& traza
+);
+
+ResultadoVerificacion verificar_traza(
+    const std::vector<AnotacionTraza>& traza,
+    Politica politica
 );
