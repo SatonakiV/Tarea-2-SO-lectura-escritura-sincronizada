@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include "tipos.hpp"
@@ -28,7 +27,7 @@ struct EstadoTraza {
 
 struct ResultadoVerificacion {
     bool valida = true;
-    std::size_t indice = 0; // En una traza incompleta indica el fin: traza.size().
+    std::size_t indice = 0;
     std::string error;
     long evidencia = 0;
 };
