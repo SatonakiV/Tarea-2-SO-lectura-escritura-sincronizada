@@ -615,22 +615,54 @@ void prueba_atomico_casos_e1() {
     }
 }
 
-void prueba_integracion_pendiente() {
+void prueba_integracion_trazas() {
     Configuracion c;
     c.politica = Politica::Fifo;
-    rechaza([&] { crear_control(c); });
+
+    exigir(
+        dynamic_cast<MonitorRW*>(crear_control(c).get()) != nullptr,
+        "modo cond fifo no crea MonitorRW"
+    );
+
     c.modo = Modo::Atomic;
     c.politica = Politica::Escritores;
-    exigir(dynamic_cast<ControlAtomicoRW*>(crear_control(c).get()) != nullptr,
-           "modo atomic no crea ControlAtomicoRW");
+
+    exigir(
+        dynamic_cast<ControlAtomicoRW*>(crear_control(c).get()) != nullptr,
+        "modo atomic no crea ControlAtomicoRW"
+    );
+
     MonitorRW monitor(Politica::Lectores);
-    for (const bool traza : {true, false}) {
-        const auto resultado = verificar_politica(monitor, Politica::Lectores, traza);
-        exigir(resultado.estado == (traza ? EstadoPolitica::Pendiente : EstadoPolitica::Desactivada),
-               "estado del verificador pendiente/notraza");
-        exigir(resultado.evidencia == 0 && resultado.indice == 0 && resultado.regla_incumplida.empty(),
-               "verificador pendiente inventa evidencia o una infraccion");
-    }
+
+    const auto activo =
+        verificar_politica(monitor, Politica::Lectores, true);
+
+    exigir(
+        activo.estado == EstadoPolitica::Correcta,
+        "la traza vacia de un monitor valido debe ser correcta"
+    );
+
+    exigir(
+        activo.evidencia == 0 &&
+        activo.indice == 0 &&
+        activo.regla_incumplida.empty(),
+        "resultado incorrecto para una traza vacia"
+    );
+
+    const auto desactivado =
+        verificar_politica(monitor, Politica::Lectores, false);
+
+    exigir(
+        desactivado.estado == EstadoPolitica::Desactivada,
+        "notraza no desactiva la verificacion"
+    );
+
+    exigir(
+        desactivado.evidencia == 0 &&
+        desactivado.indice == 0 &&
+        desactivado.regla_incumplida.empty(),
+        "resultado incorrecto con notraza"
+    );
 }
 }
 
@@ -651,7 +683,7 @@ int main() {
         {"atomico: prioridad de escritores", prueba_atomico_prioridad_escritores},
         {"atomico: exclusion de escritoras", prueba_atomico_exclusion_escritoras},
         {"atomico: casos E1 e invariantes R2", prueba_atomico_casos_e1},
-        {"integraciones y pendientes explicitas", prueba_integracion_pendiente}
+        {"integraciones y trazas R6", prueba_integracion_trazas}
     };
     int fallos = 0;
     for (const auto& prueba : pruebas) {
