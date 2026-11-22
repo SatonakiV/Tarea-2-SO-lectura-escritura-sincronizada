@@ -27,7 +27,7 @@ struct EstadoTraza {
 
 struct ResultadoVerificacion {
     bool valida = true;
-    std::size_t indice = 0;
+    std::size_t indice = 0; // En una traza incompleta indica el fin: traza.size().
     std::string error;
 };
 
