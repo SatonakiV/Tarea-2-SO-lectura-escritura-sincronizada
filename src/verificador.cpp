@@ -1,4 +1,3 @@
-
 #include "verificador.hpp"
 #include <stdexcept>
 
@@ -200,109 +199,132 @@ bool aplicar_evento(EstadoTraza& estado, const AnotacionTraza& evento, std::stri
     return true;
 }
 
-// Verifica el vector de anotaciones con todos los eventos de la ejecucion
-// y retorna el resultado de la validacion de la traza, incluyendo el indice del evento que fallo y un mensaje de error
-static ResultadoVerificacion verificar_traza_interna(
+static ResultadoVerificacion verificar_interna(
     const std::vector<AnotacionTraza>& traza,
-    bool comprobar_politica,
-    Politica politica
+    const Politica* politica
 )
 {
     EstadoTraza estado;
     std::string error;
+
     long evidencia = 0;
-    bool requiere_entrada_inmediata = false;
-    int hebra_esperada = 0;
+    long siguiente_pedido_fifo = 0;
+    long siguiente_entrada_fifo = 0;
+
+    int lectora_inmediata = -1;
+    bool esperar_entrada_inmediata = false;
 
     for (std::size_t i = 0; i < traza.size(); ++i) {
-
         const auto& evento = traza[i];
 
-        if (requiere_entrada_inmediata) {
-            if (evento.hebra != hebra_esperada ||
+        if (esperar_entrada_inmediata) {
+            if (evento.hebra != lectora_inmediata ||
                 evento.tipo != Tipo::Lectora ||
                 evento.accion != Accion::Entra) {
                 return {
                     false,
                     i,
-                    "La siguiente anotacion debe ser Entra de la lectora que pidio",
+                    "Una lectora habilitada no entro inmediatamente despues de Pide",
                     evidencia
                 };
             }
 
-            requiere_entrada_inmediata = false;
+            esperar_entrada_inmediata = false;
         }
 
-        bool viola_prioridad_escritores =
-            comprobar_politica &&
-            politica == Politica::Escritores &&
-            evento.tipo == Tipo::Lectora &&
-            evento.accion == Accion::Entra &&
-            estado.escritoras_pendientes > 0;
+        if (politica != nullptr) {
+            switch (*politica) {
+            case Politica::Lectores:
+                if (evento.tipo == Tipo::Escritora &&
+                    evento.accion == Accion::Entra &&
+                    estado.lectoras_pendientes > 0) {
+                    return {
+                        false,
+                        i,
+                        "Una escritora entra con lectoras pendientes",
+                        evidencia
+                    };
+                }
 
-        bool viola_prioridad_lectores =
-            comprobar_politica &&
-            politica == Politica::Lectores &&
-            evento.tipo == Tipo::Escritora &&
-            evento.accion == Accion::Entra &&
-            estado.lectoras_pendientes > 0;
+                if (evento.tipo == Tipo::Lectora &&
+                    evento.accion == Accion::Entra &&
+                    estado.escritoras_pendientes > 0) {
+                    ++evidencia;
+                }
 
-        bool aporta_evidencia =
-            comprobar_politica &&
-            (
-                (politica == Politica::Escritores &&
-                 evento.tipo == Tipo::Lectora &&
-                 evento.accion == Accion::Pide &&
-                 estado.escritoras_pendientes > 0)
-                ||
-                (politica == Politica::Lectores &&
-                 evento.tipo == Tipo::Lectora &&
-                 evento.accion == Accion::Entra &&
-                 estado.escritoras_pendientes > 0)
-            );
+                if (evento.tipo == Tipo::Lectora &&
+                    evento.accion == Accion::Pide &&
+                    estado.escritoras_activas == 0) {
+                    esperar_entrada_inmediata = true;
+                    lectora_inmediata = evento.hebra;
+                }
+                break;
 
-        bool lectora_debe_entrar =
-            comprobar_politica &&
-            politica == Politica::Lectores &&
-            evento.tipo == Tipo::Lectora &&
-            evento.accion == Accion::Pide &&
-            estado.escritoras_activas == 0;
+            case Politica::Escritores:
+                if (evento.tipo == Tipo::Lectora &&
+                    evento.accion == Accion::Entra &&
+                    estado.escritoras_pendientes > 0) {
+                    return {
+                        false,
+                        i,
+                        "Una lectora entra mientras hay escritoras pendientes",
+                        evidencia
+                    };
+                }
 
-        // Si aplicar_evento retorna false, quiere decir que hubo un error en la traza
-        // en tal caso se retorna el false indicando que la traza no es valida, indice i de la traza y
+                if (evento.tipo == Tipo::Lectora &&
+                    evento.accion == Accion::Pide &&
+                    estado.escritoras_pendientes > 0) {
+                    ++evidencia;
+                }
+                break;
+
+            case Politica::Fifo:
+                if (evento.accion == Accion::Pide &&
+                    evento.turno != siguiente_pedido_fifo) {
+                    return {
+                        false,
+                        i,
+                        "Turno FIFO de solicitud fuera de orden",
+                        evidencia
+                    };
+                }
+
+                if (evento.accion == Accion::Entra &&
+                    evento.turno != siguiente_entrada_fifo) {
+                    return {
+                        false,
+                        i,
+                        "Turno FIFO de admision fuera de orden",
+                        evidencia
+                    };
+                }
+
+                if (evento.tipo == Tipo::Lectora &&
+                    evento.accion == Accion::Entra &&
+                    estado.lectoras_activas > 0) {
+                    ++evidencia;
+                }
+                break;
+            }
+        }
+
         if (!aplicar_evento(estado, evento, error)) {
             return {false, i, error, evidencia};
         }
 
-        if (viola_prioridad_escritores) {
-            return {
-                false,
-                i,
-                "Una lectora entra mientras hay escritoras pendientes",
-                evidencia
-            };
-        }
+        if (politica != nullptr && *politica == Politica::Fifo) {
+            if (evento.accion == Accion::Pide) {
+                ++siguiente_pedido_fifo;
+            }
 
-        if (viola_prioridad_lectores) {
-            return {
-                false,
-                i,
-                "Una escritora entra mientras hay lectoras pendientes",
-                evidencia
-            };
-        }
-
-        if (aporta_evidencia) {
-            ++evidencia;
-        }
-
-        if (lectora_debe_entrar) {
-            requiere_entrada_inmediata = true;
-            hebra_esperada = evento.hebra;
+            if (evento.accion == Accion::Entra) {
+                ++siguiente_entrada_fifo;
+            }
         }
     }
 
-    if (requiere_entrada_inmediata) {
+    if (esperar_entrada_inmediata) {
         return {
             false,
             traza.size(),
@@ -316,7 +338,6 @@ static ResultadoVerificacion verificar_traza_interna(
         estado.escritoras_pendientes != 0 ||
         estado.lectoras_activas != 0 ||
         estado.escritoras_activas != 0) {
-
         return {
             false,
             traza.size(),
@@ -328,9 +349,13 @@ static ResultadoVerificacion verificar_traza_interna(
     return {true, 0, "", evidencia};
 }
 
-ResultadoVerificacion verificar_traza(const std::vector<AnotacionTraza>& traza)
+// Verifica el vector de anotaciones con todos los eventos de la ejecucion
+// y retorna el resultado de la validacion de la traza, incluyendo el indice del evento que fallo y un mensaje de error
+ResultadoVerificacion verificar_traza(
+    const std::vector<AnotacionTraza>& traza
+)
 {
-    return verificar_traza_interna(traza, false, Politica::Escritores);
+    return verificar_interna(traza, nullptr);
 }
 
 ResultadoVerificacion verificar_traza(
@@ -338,12 +363,11 @@ ResultadoVerificacion verificar_traza(
     Politica politica
 )
 {
-    if (politica != Politica::Escritores &&
-        politica != Politica::Lectores) {
-        throw std::invalid_argument(
-            "Esta politica aun no esta implementada en el verificador"
-        );
+    if (politica != Politica::Lectores &&
+        politica != Politica::Escritores &&
+        politica != Politica::Fifo) {
+        throw std::invalid_argument("Politica desconocida para verificar la traza");
     }
 
-    return verificar_traza_interna(traza, true, politica);
+    return verificar_interna(traza, &politica);
 }
