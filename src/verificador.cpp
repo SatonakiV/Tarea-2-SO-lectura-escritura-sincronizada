@@ -216,6 +216,7 @@ static ResultadoVerificacion verificar_interna(
 
     for (std::size_t i = 0; i < traza.size(); ++i) {
         const auto& evento = traza[i];
+        bool sumar_evidencia = false;
 
         if (esperar_entrada_inmediata) {
             if (evento.hebra != lectora_inmediata ||
@@ -233,6 +234,15 @@ static ResultadoVerificacion verificar_interna(
         }
 
         if (politica != nullptr) {
+            if (*politica != Politica::Fifo && evento.turno != -1) {
+                return {
+                    false,
+                    i,
+                    "Las politicas de prioridad requieren turno -1",
+                    evidencia
+                };
+            }
+
             switch (*politica) {
             case Politica::Lectores:
                 if (evento.tipo == Tipo::Escritora &&
@@ -249,14 +259,7 @@ static ResultadoVerificacion verificar_interna(
                 if (evento.tipo == Tipo::Lectora &&
                     evento.accion == Accion::Entra &&
                     estado.escritoras_pendientes > 0) {
-                    ++evidencia;
-                }
-
-                if (evento.tipo == Tipo::Lectora &&
-                    evento.accion == Accion::Pide &&
-                    estado.escritoras_activas == 0) {
-                    esperar_entrada_inmediata = true;
-                    lectora_inmediata = evento.hebra;
+                    sumar_evidencia = true;
                 }
                 break;
 
@@ -275,7 +278,7 @@ static ResultadoVerificacion verificar_interna(
                 if (evento.tipo == Tipo::Lectora &&
                     evento.accion == Accion::Pide &&
                     estado.escritoras_pendientes > 0) {
-                    ++evidencia;
+                    sumar_evidencia = true;
                 }
                 break;
 
@@ -303,7 +306,7 @@ static ResultadoVerificacion verificar_interna(
                 if (evento.tipo == Tipo::Lectora &&
                     evento.accion == Accion::Entra &&
                     estado.lectoras_activas > 0) {
-                    ++evidencia;
+                    sumar_evidencia = true;
                 }
                 break;
             }
@@ -311,6 +314,18 @@ static ResultadoVerificacion verificar_interna(
 
         if (!aplicar_evento(estado, evento, error)) {
             return {false, i, error, evidencia};
+        }
+
+        if (sumar_evidencia) {
+            ++evidencia;
+        }
+
+        if (politica != nullptr && *politica == Politica::Lectores &&
+            evento.tipo == Tipo::Lectora &&
+            evento.accion == Accion::Pide &&
+            estado.escritoras_activas == 0) {
+            esperar_entrada_inmediata = true;
+            lectora_inmediata = evento.hebra;
         }
 
         if (politica != nullptr && *politica == Politica::Fifo) {
