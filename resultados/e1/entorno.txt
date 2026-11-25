@@ -1,0 +1,11 @@
+fecha: 2026-11-25T20:31:21
+commit: b9e8e06bdb2b5b002c02c34194eb2a7c6839e134
+rama: rama.joaco
+sistema: Linux MatebookDeJoaco 6.18.58.1-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Tue Oct 27 00:24:11 UTC 2026 x86_64 
+wsl: SI
+cpu: Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz
+cpus_logicas: 8
+compilador: g++ (Ubuntu 15.2.0-16ubuntu1) 15.2.0
+python: 3.14.4
+ejecutable: /mnt/c/Users/joaqu/Tarea-2-SO-lectura-escritura-sincronizada/rw
+repeticiones: 5
