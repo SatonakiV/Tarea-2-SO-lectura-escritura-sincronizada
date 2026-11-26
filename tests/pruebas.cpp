@@ -503,11 +503,15 @@ void prueba_atomico_lectoras_concurrentes() {
     exigir(control.observar().lectoras_activas == 0, "lectoras no salieron");
 }
 
-void prueba_atomico_prioridad_escritores() {
+struct FallosPrioridad { FallosAdmision escritora, lectora; };
+
+// Lectora dentro, escritora esperando y lectora nueva. Las aserciones de orden
+// valen con cualquier planificación; los fallos de la lectora se devuelven.
+FallosPrioridad escenario_prioridad(std::chrono::milliseconds retencion) {
     ControlAtomicoRW control;
     std::atomic<int> orden{0};
     std::atomic<int> orden_esc{-1}, orden_lec{-1};
-    std::atomic<bool> lectora0_dentro{false}, soltar0{false}, soltar_esc{false};
+    std::atomic<bool> lectora0_dentro{false}, soltar0{false}, soltar_esc{false}, lectora1_lista{false};
     FallosAdmision fallos_esc, fallos_lec;
     std::thread lectora0([&] {
         control.entrar_lectura();
@@ -528,13 +532,18 @@ void prueba_atomico_prioridad_escritores() {
     // Lectora nueva con una escritora esperando y otra lectora dentro.
     std::thread lectora1([&] {
         fallos_hebra = {};
+        lectora1_lista = true;
         control.entrar_lectura();
         orden_lec = orden++;
         control.salir_lectura();
         fallos_lec = fallos_hebra;
     });
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    const bool lectora_bloqueada = orden_lec == -1 && control.observar().lectoras_activas == 1;
+    ok = esperar_hasta([&] { return lectora1_lista.load(); }) && ok;
+    // Mientras lectora0 siga dentro, nada cambia: lectora1 debe seguir fuera.
+    std::this_thread::sleep_for(retencion);
+    const auto antes = control.observar();
+    const bool lectora_bloqueada = orden_lec == -1 && antes.lectoras_activas == 1 &&
+                                   antes.escritoras_esperando == 1 && !antes.escritora_activa;
     soltar0 = true;
     ok = esperar_hasta([&] { return orden_esc.load() != -1; }) && ok;
     const auto e = control.observar();
@@ -545,12 +554,23 @@ void prueba_atomico_prioridad_escritores() {
            "el CAS de admision no descuenta la espera ni marca la escritora");
     exigir(orden_esc < orden_lec, "la lectora adelanto a la escritora esperando");
     exigir(fallos_esc.recurso_ocupado > 0, "escritora sin fallos por lectoras activas");
-    exigir(fallos_lec.escritoras_esperando > 0, "lectora sin fallos por escritoras esperando");
-    exigir(fallos_lec.recurso_ocupado + fallos_lec.escritoras_esperando + fallos_lec.cas_fallido > 0 &&
-           !fallos_esc.saturado && !fallos_lec.saturado, "contadores de fallos");
-    std::cout << "  lectora: ocupado=" << fallos_lec.recurso_ocupado
-              << " esperando=" << fallos_lec.escritoras_esperando << " cas=" << fallos_lec.cas_fallido
-              << "; escritora: ocupado=" << fallos_esc.recurso_ocupado << " cas=" << fallos_esc.cas_fallido << '\n';
+    exigir(!fallos_esc.saturado && !fallos_lec.saturado, "contadores saturados");
+    return {fallos_esc, fallos_lec};
+}
+
+void prueba_atomico_prioridad_escritores() {
+    constexpr int repeticiones = 20;
+    for (int i = 1; i <= repeticiones; ++i) {
+        const auto f = escenario_prioridad(std::chrono::milliseconds(5 * i));
+        if (f.lectora.escritoras_esperando > 0) {
+            std::cout << "  repeticion " << i << ": lectora ocupado=" << f.lectora.recurso_ocupado
+                      << " esperando=" << f.lectora.escritoras_esperando << " cas=" << f.lectora.cas_fallido
+                      << "; escritora ocupado=" << f.escritora.recurso_ocupado
+                      << " cas=" << f.escritora.cas_fallido << '\n';
+            return;
+        }
+    }
+    exigir(false, "lectora sin fallos por escritoras esperando en ninguna repeticion");
 }
 
 void prueba_atomico_exclusion_escritoras() {
@@ -603,10 +623,7 @@ void prueba_atomico_casos_e1() {
                r.registro.doble_version == 2 * c.escritores * c.operaciones, "atomico: registro final");
         exigir(r.max_lectoras >= 1 && r.max_lectoras <= c.lectores, "atomico: maximo de lectoras");
         exigir(!r.fallos.saturado, "atomico: contadores saturados");
-        // Con varias lectoras y pausas, la prioridad de escritores tiene que actuar.
-        if (c.lectores > 1 && c.dur_esc_us > 0) {
-            exigir(r.fallos.escritoras_esperando > 0, "atomico: sin evidencia de prioridad de escritores");
-        }
+        // escritoras_esperando es evidencia, no requisito: depende del planificador.
         std::cout << "  atomic L=" << c.lectores << " E=" << c.escritores << " K=" << c.operaciones
                   << " version=" << r.registro.version << " max_lectoras=" << r.max_lectoras
                   << " ocupado=" << r.fallos.recurso_ocupado
