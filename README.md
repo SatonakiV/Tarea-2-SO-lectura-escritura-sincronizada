@@ -86,8 +86,9 @@ make e1             # solo E1
 make e2             # solo E2
 ```
 
-Los resultados quedan en `resultados/`: salida original de cada ejecución,
-CSV por ejecución, promedios, resúmenes en Markdown y gráficos de E2 (requiere
-`matplotlib`). `make experimentos` se detiene antes de E2 si E1 detecta un fallo.
-`REPS` y `RESULTADOS` permiten una prueba rápida sin pisar los datos, por ejemplo
-`make experimentos REPS=1 RESULTADOS=/tmp/prueba`. El detalle está en `readme.txt`.
+Cada corrida se guarda en una carpeta nueva, `material-local/experimentos/<fecha-hora>/`,
+con la salida original de cada ejecución, CSV, promedios, resúmenes en Markdown y
+gráficos de E2 (requiere `matplotlib`). La medición que cita el informe está en
+`resultados/` y no se sobrescribe. `make experimentos` ejecuta los pasos en orden,
+también con `make -j`, y se detiene antes de E2 si E1 detecta un fallo. Para una
+prueba rápida: `make experimentos REPS=1`. El detalle está en `readme.txt`.

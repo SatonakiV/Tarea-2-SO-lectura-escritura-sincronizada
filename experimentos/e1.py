@@ -12,9 +12,9 @@ import argparse
 from pathlib import Path
 
 from comun import (
-    CASOS, RESPONSABLE_POLITICA, RESPONSABLE_R2, VARIANTES_E1, comando_rw,
-    analizar_salida, ejecutar, escribir_csv, guardar_crudo, media,
-    registrar_entorno,
+    CASOS, RESPONSABLE_POLITICA, RESPONSABLE_R2, SIN_ATRIBUIR, VARIANTES_E1,
+    analizar_salida, comando_rw, ejecutar, es_entero, escribir_csv,
+    guardar_crudo, media, preparar_salida, registrar_entorno, repeticiones,
 )
 
 CAMPOS = [
@@ -28,18 +28,31 @@ CAMPOS = [
 ]
 
 
-def comprobar(fila, modo, L, E, K):
-    """Devuelve las comprobaciones incumplidas y a quién remitirlas."""
-    fallas, responsables = [], set()
-    variante = (modo, fila["politica"])
+FALLOS_ATOMICOS = ("fallos_recurso_ocupado", "fallos_escritoras_esperando", "fallos_cas")
 
-    def exigir(condicion, detalle, responsable):
+
+def comprobar(fila, modo, L, E, K):
+    """Devuelve las comprobaciones incumplidas y a quién remitirlas.
+
+    El código de salida y `correcto` solo marcan la corrida como fallida: la
+    responsabilidad se atribuye por los campos específicos que fallaron.
+    """
+    fallas, responsables = [], set()
+    r2 = RESPONSABLE_R2[(modo, fila["politica"])]
+
+    def exigir(condicion, detalle, responsable=None):
         if not condicion:
             fallas.append(detalle)
-            responsables.add(responsable)
+            if responsable:
+                responsables.add(responsable)
 
-    r2 = RESPONSABLE_R2[variante]
-    exigir(fila["codigo"] == 0, f"codigo={fila['codigo']}", r2)
+    exigir(fila["codigo"] == 0, f"codigo={fila['codigo']}")
+    if "r2_ok" not in fila:
+        # Sin resumen (caída, timeout o salida vacía): no hay datos para atribuir.
+        fallas.append("sin resumen en stdout")
+        return fallas, [SIN_ATRIBUIR]
+
+    exigir(fila.get("correcto") == "SI", f"correcto={fila.get('correcto', 'falta')}")
     exigir(fila.get("r2_ok") == "SI", "r2_ok", r2)
     exigir(fila.get("version_final") == str(E * K), "version_final", r2)
     exigir(fila.get("doble_version_final") == str(2 * E * K), "doble_version_final", r2)
@@ -47,17 +60,21 @@ def comprobar(fila, modo, L, E, K):
     exigir(fila.get("inconsistencias") == "0", "inconsistencias", r2)
     exigir(fila.get("violaciones_exclusion") == "0", "exclusion", r2)
     exigir(fila.get("diagnostico_vacio") == "SI", "diagnostico_vacio", r2)
-    try:
-        exigir(1 <= int(fila.get("max_lectoras", "-1")) <= L, "max_lectoras", r2)
-    except ValueError:
-        exigir(False, "max_lectoras", r2)
+    exigir(es_entero(fila.get("max_lectoras")) and 1 <= int(fila["max_lectoras"]) <= L,
+           "max_lectoras", r2)
     if modo == "cond":
-        exigir(fila.get("politica_ok") == "SI", "politica_ok", RESPONSABLE_POLITICA)
-        exigir(fila.get("correcto") == "SI", "correcto", RESPONSABLE_POLITICA)
+        # R6: con traza activa el verificador debe aprobar e informar su evidencia.
+        exigir(fila.get("politica_ok") == "SI",
+               f"politica_ok={fila.get('politica_ok', 'falta')}", RESPONSABLE_POLITICA)
+        exigir(es_entero(fila.get("evidencia")), "falta evidencia R6", RESPONSABLE_POLITICA)
     else:
+        # R10: los contadores deben estar presentes; un 0 es válido.
         exigir(fila.get("politica_ok") == "NA", "politica_ok", r2)
-        exigir(fila.get("correcto") == "SI", "correcto", r2)
+        for campo in FALLOS_ATOMICOS:
+            exigir(es_entero(fila.get(campo)), f"falta {campo} R10", r2)
         exigir(fila.get("fallos_saturados") == "NO", "fallos_saturados", r2)
+    if fallas and not responsables:
+        responsables.add(SIN_ATRIBUIR)
     return fallas, sorted(responsables)
 
 
@@ -67,7 +84,8 @@ def resumen(filas, entorno):
     lineas = [
         "# E1: corrección y prioridades",
         "",
-        f"Commit `{entorno['commit']}` (rama `{entorno['rama']}`), "
+        f"Checkout `{entorno['commit_checkout']}` (rama `{entorno['rama']}`), "
+        f"huella C++ `{entorno['huella_cpp']}`, huella scripts `{entorno['huella_scripts']}`, "
         f"{entorno['fecha']}, {entorno['cpu']} ({entorno['cpus_logicas']} CPU lógicas).",
         "",
         f"**Ejecuciones correctas: {correctas}/{total}.**",
@@ -89,13 +107,13 @@ def resumen(filas, entorno):
             grupos.items(), key=lambda g: (g[0][0], orden[(g[0][1], g[0][2])])):
         g0 = grupo[0]
         ok = sum(f["ok"] == "SI" for f in grupo)
-        evid = [int(f["evidencia"]) for f in grupo if f["evidencia"].isdigit()]
-        maxl = [int(f["max_lectoras"]) for f in grupo if f["max_lectoras"].isdigit()]
+        evid = [int(f.get("evidencia")) for f in grupo if es_entero(f.get("evidencia"))]
+        maxl = [int(f.get("max_lectoras")) for f in grupo if es_entero(f.get("max_lectoras"))]
         if modo == "atomic":
-            fallos = [
-                f"{media([int(f[c]) for f in grupo if f[c].isdigit()]):.0f}"
-                for c in ("fallos_recurso_ocupado", "fallos_escritoras_esperando", "fallos_cas")
-            ]
+            fallos = []
+            for c in FALLOS_ATOMICOS:
+                m = media([int(f.get(c)) for f in grupo if es_entero(f.get(c))])
+                fallos.append("NA" if m is None else f"{m:.0f}")
         else:
             fallos = ["NA"] * 3
         lineas.append(
@@ -121,12 +139,14 @@ def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--rw", default="./rw", help="ejecutable (por defecto ./rw)")
-    p.add_argument("--reps", type=int, default=5)
-    p.add_argument("--salida", type=Path, default=Path("resultados/e1"))
+    p.add_argument("--reps", type=repeticiones, default=5)
+    p.add_argument("--salida", type=Path, required=True,
+                   help="carpeta nueva o vacía para esta corrida")
     p.add_argument("--limite", type=float, default=120, help="segundos por ejecución")
     a = p.parse_args()
 
     rw = comando_rw(a.rw)
+    preparar_salida(a.salida)
     entorno = registrar_entorno(a.salida / "entorno.txt", rw, {"repeticiones": a.reps})
     filas = []
     total = a.reps * len(CASOS) * len(VARIANTES_E1)

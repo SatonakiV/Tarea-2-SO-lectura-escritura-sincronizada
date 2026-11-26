@@ -1,7 +1,9 @@
 """Gráficos de E2 a partir de promedios.csv (requiere matplotlib).
 
-Un archivo por métrica: un panel por caso con su propia escala, porque el
-caso 4 (K=10000) tiene otra magnitud. Barras = promedio, línea = ± desviación.
+Un archivo por métrica graficada (tiempos y esperas; los fallos atómicos van
+en tabla): un panel por caso con su propia escala, porque el caso 4 (K=10000)
+tiene otra magnitud. Barras = promedio de las ejecuciones válidas, línea = ±
+desviación. Un grupo sin ejecuciones válidas se marca NA.
 """
 import argparse
 import sys
@@ -17,7 +19,8 @@ METRICAS = [
     ("cpu_s", "Tiempo de CPU del proceso (s)"),
     ("espera_escritura_media_us", "Espera media de escritoras (µs)"),
     ("espera_lectura_media_us", "Espera media de lectoras (µs)"),
-    ("espera_escritura_max_us", "Espera máxima de escritoras (µs)"),
+    ("espera_lectura_max_us", "Espera máxima de lectoras (µs, promedio de los máximos por ejecución)"),
+    ("espera_escritura_max_us", "Espera máxima de escritoras (µs, promedio de los máximos por ejecución)"),
 ]
 
 
@@ -46,7 +49,10 @@ def main():
             g0 = por.get((caso, "cond")) or por.get((caso, "atomic"))
             for i, modo in enumerate(("cond", "atomic")):
                 f = por.get((caso, modo))
-                if not f:
+                if not f or not f.get(f"{metrica}_media"):
+                    # Grupo sin ejecuciones válidas: se marca en vez de dibujar un valor.
+                    eje.annotate("NA", (i, 0), xytext=(0, 3), textcoords="offset points",
+                                 ha="center", fontsize=8, color=SECUNDARIO)
                     continue
                 m, d = float(f[f"{metrica}_media"]), float(f[f"{metrica}_desv"])
                 eje.bar(i, m, width=0.6, color=COLORES[modo], edgecolor="white",

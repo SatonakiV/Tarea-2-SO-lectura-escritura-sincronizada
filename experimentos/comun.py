@@ -3,8 +3,11 @@
 Los casos y variantes son los del enunciado. Cada ejecución guarda su salida
 original en un archivo propio para que los resultados sean rastreables.
 """
+import argparse
 import csv
 import datetime
+import hashlib
+import math
 import os
 import platform
 import shlex
@@ -46,6 +49,24 @@ RESPONSABLE_R2 = {
     ("atomic", "escritores"): "P3",
 }
 RESPONSABLE_POLITICA = "P2"
+SIN_ATRIBUIR = "sin atribuir"
+
+
+def repeticiones(texto):
+    valor = int(texto)
+    if valor < 1:
+        raise argparse.ArgumentTypeError("--reps debe ser al menos 1")
+    return valor
+
+
+def preparar_salida(ruta):
+    """Rechaza una carpeta con resultados previos para no mezclar ni pisar corridas."""
+    if ruta.exists() and any(ruta.iterdir()):
+        raise SystemExit(
+            f"La carpeta {ruta} ya contiene resultados. Use otra carpeta "
+            f"(RESULTADOS=...) o bórrela si de verdad quiere reemplazarlos."
+        )
+    ruta.mkdir(parents=True, exist_ok=True)
 
 
 def comando_rw(texto):
@@ -62,6 +83,23 @@ def analizar_salida(stdout):
     return dict(par.split("=", 1) for par in stdout.split() if "=" in par)
 
 
+def es_entero(valor):
+    return isinstance(valor, str) and valor.isdigit()
+
+
+def es_numero(valor):
+    try:
+        return math.isfinite(float(valor))
+    except (TypeError, ValueError):
+        return False
+
+
+def _texto(valor):
+    if valor is None:
+        return ""
+    return valor.decode(errors="replace") if isinstance(valor, bytes) else valor
+
+
 def ejecutar(rw, argumentos, limite_s):
     inicio = time.monotonic()
     try:
@@ -71,8 +109,9 @@ def ejecutar(rw, argumentos, limite_s):
         codigo, stdout, stderr = proceso.returncode, proceso.stdout, proceso.stderr
     except subprocess.TimeoutExpired as e:
         codigo = "TIMEOUT"
-        stdout = e.stdout.decode() if isinstance(e.stdout, bytes) else (e.stdout or "")
-        stderr = f"Superado el límite de {limite_s} s"
+        stdout = _texto(e.stdout)
+        # Se conserva lo que el proceso alcanzó a escribir antes del límite.
+        stderr = _texto(e.stderr) + f"Superado el límite de {limite_s} s\n"
     return codigo, stdout, stderr, time.monotonic() - inicio
 
 
@@ -101,26 +140,39 @@ def leer_csv(ruta):
 
 
 def media(valores):
-    return statistics.fmean(valores) if valores else float("nan")
+    return statistics.fmean(valores) if valores else None
 
 
 def desviacion(valores):
+    if not valores:
+        return None
     return statistics.stdev(valores) if len(valores) > 1 else 0.0
 
 
-def _commit_actual():
-    """Lee el commit desde .git sin invocar git."""
+def _directorio_git():
+    """Ubica el directorio de git, también en un worktree donde .git es un archivo."""
     git = RAIZ / ".git"
+    if git.is_file():
+        texto = git.read_text().strip()
+        if texto.startswith("gitdir: "):
+            git = (RAIZ / texto[8:]).resolve()
+    comun = git / "commondir"
+    return git, ((git / comun.read_text().strip()).resolve() if comun.exists() else git)
+
+
+def _commit_actual():
+    """Lee el commit del checkout desde los archivos de git."""
     try:
+        git, comun = _directorio_git()
         cabeza = (git / "HEAD").read_text().strip()
         if not cabeza.startswith("ref: "):
             return cabeza, "(HEAD separado)"
         ref = cabeza[5:]
         rama = ref.rsplit("refs/heads/", 1)[-1]
-        archivo = git / ref
-        if archivo.exists():
-            return archivo.read_text().strip(), rama
-        empaquetadas = git / "packed-refs"
+        for base in (git, comun):
+            if (base / ref).exists():
+                return (base / ref).read_text().strip(), rama
+        empaquetadas = comun / "packed-refs"
         if empaquetadas.exists():
             for linea in empaquetadas.read_text().splitlines():
                 if linea.endswith(" " + ref):
@@ -128,6 +180,19 @@ def _commit_actual():
         return "desconocido", rama
     except OSError:
         return "desconocido", "desconocida"
+
+
+def huella(*patrones):
+    """SHA-256 de los archivos indicados, con fines de línea normalizados.
+
+    Identifica el contenido medido aunque haya cambios sin commit o el commit
+    con los scripts sea posterior al del C++ medido.
+    """
+    h = hashlib.sha256()
+    for ruta in sorted({p for patron in patrones for p in RAIZ.glob(patron) if p.is_file()}):
+        h.update(ruta.relative_to(RAIZ).as_posix().encode() + b"\0")
+        h.update(ruta.read_bytes().replace(b"\r\n", b"\n") + b"\0")
+    return h.hexdigest()[:16]
 
 
 def _salida(comando):
@@ -154,8 +219,10 @@ def registrar_entorno(ruta, rw, extra=None):
     gxx = _salida([os.environ.get("CXX", "g++"), "--version"]).splitlines()
     lineas = {
         "fecha": datetime.datetime.now().isoformat(timespec="seconds"),
-        "commit": commit,
+        "commit_checkout": commit,
         "rama": rama,
+        "huella_cpp": huella("src/*.cpp", "include/*.hpp"),
+        "huella_scripts": huella("experimentos/*.py"),
         "sistema": " ".join(platform.uname()),
         "wsl": "SI" if "microsoft" in platform.release().lower() else "NO",
         "cpu": _modelo_cpu(),

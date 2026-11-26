@@ -3,10 +3,10 @@ $ /mnt/c/Users/joaqu/Tarea-2-SO-lectura-escritura-sincronizada/rw cond escritore
 # --- stdout
 modo=cond politica=escritores L=8 E=8 K=10000 dur_lec_us=0 dur_esc_us=0
 hebras_creadas=16 operaciones_previstas=160000 operaciones_realizadas=160000 lecturas=80000 escrituras=80000
-version_final=80000 doble_version_final=160000 inconsistencias=0 violaciones_exclusion=0 diagnostico_vacio=SI max_lectoras=4
-pared_s=4.266975 cpu_s=7.263542 fuente_cpu=CLOCK_PROCESS_CPUTIME_ID
-solicitudes_lectura=80000 espera_lectura_media_us=423.555440 espera_lectura_max_us=4208023.195000
-solicitudes_escritura=80000 espera_escritura_media_us=370.558475 espera_escritura_max_us=19411.701000
+version_final=80000 doble_version_final=160000 inconsistencias=0 violaciones_exclusion=0 diagnostico_vacio=SI max_lectoras=5
+pared_s=4.128590 cpu_s=7.017960 fuente_cpu=CLOCK_PROCESS_CPUTIME_ID
+solicitudes_lectura=80000 espera_lectura_media_us=410.026562 espera_lectura_max_us=4046636.906000
+solicitudes_escritura=80000 espera_escritura_media_us=355.755647 espera_escritura_max_us=11408.900000
 fallos_aplican=NO fallos_recurso_ocupado=0 fallos_escritoras_esperando=0 fallos_cas=0 fallos_saturados=NO
 r2_ok=SI correcto=SI traza=desactivada politica_ok=NA evidencia=NA
 # --- stderr

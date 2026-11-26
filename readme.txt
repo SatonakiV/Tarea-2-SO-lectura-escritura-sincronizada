@@ -24,8 +24,9 @@ En Ubuntu/WSL:
 
   sudo apt install build-essential python3 python3-matplotlib
 
-Cada experimento guarda en resultados/<e1|e2>/entorno.txt la fecha, el
-commit, la CPU, el numero de CPU logicas y la version del compilador.
+Cada experimento guarda en <carpeta>/<e1|e2>/entorno.txt la fecha, el
+commit, las huellas del codigo, la CPU, el numero de CPU logicas y la
+version del compilador.
 
 
 2. Compilar y ejecutar
@@ -76,27 +77,40 @@ Casos (enunciado):
   4     8  8  100  0           0      (E2: K=10000)
   5     8  1  200  1000        100
 
-Variables opcionales: REPS=5, RESULTADOS=resultados, PYTHON=python3.
-Por ejemplo, una prueba rapida que no pisa los datos del informe:
+Carpetas de resultados:
 
-  make experimentos REPS=1 RESULTADOS=/tmp/prueba
+  resultados/                      medicion publicada, la que cita el informe
+  material-local/experimentos/<fecha-hora>/
+                                   cada nueva corrida (ignorada por git)
 
-make e1 termina con error si alguna ejecucion falla, y make experimentos se
-detiene antes de E2 en ese caso, para no medir una version con fallos.
+make experimentos escribe por defecto en una carpeta nueva bajo
+material-local/, asi que reproducir no pisa la medicion publicada. Los
+scripts se niegan a escribir en una carpeta que ya tiene resultados.
+Variables opcionales: REPS=5, RESULTADOS=<carpeta>, PYTHON=python3.
 
-Archivos generados:
+  make experimentos REPS=1          prueba rapida (REPS debe ser >= 1)
+  make graficos RESULTADOS=<carpeta de una corrida>
 
-  resultados/e1/crudo/       salida original de cada ejecucion (comando,
-                             codigo de salida, stdout y stderr)
-  resultados/e1/e1.csv       una fila por ejecucion y comprobaciones
-  resultados/e1/resumen.md   tabla por caso/variante, evidencia y errores
-                             con el responsable del modulo (P1, P2 o P3)
-  resultados/e2/crudo/       salida original de cada ejecucion
-  resultados/e2/e2.csv       datos originales de las 50 mediciones
-  resultados/e2/promedios.csv promedio y desviacion de las 5 repeticiones
-  resultados/e2/resumen.md   tablas de tiempos, esperas, fallos atomicos y
-                             razon atomic/cond
-  resultados/e2/graficos/    un PNG por metrica
+make experimentos ejecuta E1, E2 y graficos en orden, tambien con make -j, y
+se detiene antes de E2 si alguna ejecucion de E1 falla, para no medir una
+version con fallos.
+
+Archivos de cada corrida (<carpeta> = resultados/ o material-local/...):
+
+  e1/crudo/          salida original de cada ejecucion (comando, codigo de
+                     salida, stdout y stderr, incluso si hubo timeout)
+  e1/e1.csv          una fila por ejecucion y sus comprobaciones
+  e1/resumen.md      tabla por caso/variante, evidencia y errores con el
+                     responsable del modulo (P1, P2, P3 o "sin atribuir")
+  e2/crudo/          salida original de cada ejecucion
+  e2/e2.csv          datos originales de las 50 mediciones, tambien las no validas
+  e2/promedios.csv   promedio y desviacion de las repeticiones validas
+                     (NA si un grupo no tiene ninguna)
+  e2/resumen.md      tablas de tiempos, esperas, fallos atomicos, razon
+                     atomic/cond y ejecuciones no validas
+  e2/graficos/       un PNG por metrica de tiempo y espera (pared, CPU,
+                     espera media y maxima de lectoras y de escritoras)
+  */entorno.txt      fecha, commit del checkout, huellas, CPU y compilador
 
 Metodo de medicion (E2): tiempo de pared con std::chrono::steady_clock y CPU
 del proceso con CLOCK_PROCESS_CPUTIME_ID, ambos desde antes de crear las
@@ -104,6 +118,20 @@ hebras hasta completar todos los join(). La espera de cada solicitud se mide
 desde antes de llamar a entrar_*() hasta su retorno. Las repeticiones se
 alternan entre variantes para repartir perturbaciones de la maquina.
 
-Para reproducir sobre la misma version, compilar el commit indicado en
-resultados/e2/entorno.txt. Los tiempos dependen de la maquina y su carga;
-conviene ejecutar con el equipo en reposo y conectado a la corriente.
+Las esperas maximas de resumen.md y de los graficos son el promedio de los
+maximos de cada ejecucion; el mayor valor individual esta en e2.csv.
+
+Reproducir la medicion publicada:
+
+  entorno.txt registra dos huellas SHA-256 (16 primeros caracteres):
+  huella_cpp sobre src/*.cpp e include/*.hpp (el programa medido) y
+  huella_scripts sobre experimentos/*.py. Basta usar cualquier commit que
+  contenga experimentos/ y cuya huella_cpp coincida con la de
+  resultados/e2/entorno.txt: ese commit tiene el mismo C++ medido y los
+  scripts para repetir la tanda. Al correr make experimentos, compare la
+  huella_cpp de la nueva corrida con la publicada. commit_checkout indica
+  el commit que estaba en el checkout al medir; no refleja cambios sin
+  commit, por eso se usan las huellas.
+
+Los tiempos dependen de la maquina y su carga; conviene ejecutar con el
+equipo en reposo y conectado a la corriente.

@@ -4,9 +4,9 @@ $ /mnt/c/Users/joaqu/Tarea-2-SO-lectura-escritura-sincronizada/rw atomic escrito
 modo=atomic politica=escritores L=8 E=1 K=200 dur_lec_us=1000 dur_esc_us=100
 hebras_creadas=9 operaciones_previstas=1800 operaciones_realizadas=1800 lecturas=1600 escrituras=200
 version_final=200 doble_version_final=400 inconsistencias=0 violaciones_exclusion=0 diagnostico_vacio=SI max_lectoras=8
-pared_s=0.526993 cpu_s=2.158664 fuente_cpu=CLOCK_PROCESS_CPUTIME_ID
-solicitudes_lectura=1600 espera_lectura_media_us=1277.629042 espera_lectura_max_us=35242.901000
-solicitudes_escritura=200 espera_escritura_media_us=1412.991545 espera_escritura_max_us=10528.300000
-fallos_aplican=SI fallos_recurso_ocupado=680777 fallos_escritoras_esperando=1310817 fallos_cas=1269 fallos_saturados=NO
+pared_s=0.422407 cpu_s=1.330652 fuente_cpu=CLOCK_PROCESS_CPUTIME_ID
+solicitudes_lectura=1600 espera_lectura_media_us=724.498634 espera_lectura_max_us=14897.412000
+solicitudes_escritura=200 espera_escritura_media_us=1342.857515 espera_escritura_max_us=5850.004000
+fallos_aplican=SI fallos_recurso_ocupado=394215 fallos_escritoras_esperando=312837 fallos_cas=1283 fallos_saturados=NO
 r2_ok=SI correcto=SI traza=desactivada politica_ok=NA evidencia=NA
 # --- stderr

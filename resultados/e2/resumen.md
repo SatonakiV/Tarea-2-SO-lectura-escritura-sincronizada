@@ -1,48 +1,50 @@
 # E2: costo de sincronización
 
-Commit `b9e8e06bdb2b5b002c02c34194eb2a7c6839e134` (rama `rama.joaco`), 2026-11-25T20:31:54, Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz (8 CPU lógicas), g++ (Ubuntu 15.2.0-16ubuntu1) 15.2.0.
+Checkout `9d314d9364d665f027a5ff286d7c47e5dd5c8fc4` (rama `rama.joaco`), huella C++ `d8a48c0f37d3d1cf`, huella scripts `d96402c5f1f9524b`, 2026-11-26T08:46:22, Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz (8 CPU lógicas), g++ (Ubuntu 15.2.0-16ubuntu1) 15.2.0.
 
-Promedio de las repeticiones (± desviación estándar), `notraza`. Pared: `steady_clock`; CPU: `CLOCK_PROCESS_CPUTIME_ID`. Ambas cubren desde antes de crear las hebras hasta completar todos los `join()`. El tiempo de CPU incluye trabajo útil, no solo espera.
+Promedio ± desviación estándar de las repeticiones válidas, `notraza`. Pared: `steady_clock`; CPU: `CLOCK_PROCESS_CPUTIME_ID`. Ambas cubren desde antes de crear las hebras hasta completar todos los `join()`. El tiempo de CPU incluye trabajo útil, no solo espera.
 
 ## Tiempos
 
 | Caso | L | E | K | lec µs | esc µs | Variante | Válidas | Pared (s) | CPU (s) | CPU/pared |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1 | 1 | 1 | 20 | 500 | 500 | atomic | 5/5 | 0.0308 ± 0.0027 | 0.0326 ± 0.0035 | 1.06 |
-| 1 | 1 | 1 | 20 | 500 | 500 | cond | 5/5 | 0.0335 ± 0.0034 | 0.0065 ± 0.0022 | 0.19 |
-| 2 | 6 | 2 | 100 | 200 | 500 | atomic | 5/5 | 0.2191 ± 0.0499 | 1.2853 ± 0.2909 | 5.87 |
-| 2 | 6 | 2 | 100 | 200 | 500 | cond | 5/5 | 0.2868 ± 0.0429 | 0.1741 ± 0.0585 | 0.59 |
-| 3 | 2 | 6 | 100 | 500 | 200 | atomic | 5/5 | 0.3998 ± 0.1184 | 2.2463 ± 0.8390 | 5.53 |
-| 3 | 2 | 6 | 100 | 500 | 200 | cond | 5/5 | 0.3232 ± 0.0413 | 0.0795 ± 0.0269 | 0.24 |
-| 4 | 8 | 8 | 10000 | 0 | 0 | atomic | 5/5 | 0.0424 ± 0.0095 | 0.2617 ± 0.0783 | 6.22 |
-| 4 | 8 | 8 | 10000 | 0 | 0 | cond | 5/5 | 4.1483 ± 0.0951 | 7.2038 ± 0.1749 | 1.74 |
-| 5 | 8 | 1 | 200 | 1000 | 100 | atomic | 5/5 | 0.5833 ± 0.1219 | 2.5929 ± 0.8637 | 4.37 |
-| 5 | 8 | 1 | 200 | 1000 | 100 | cond | 5/5 | 0.6269 ± 0.0449 | 0.3998 ± 0.0944 | 0.63 |
+| 1 | 1 | 1 | 20 | 500 | 500 | atomic | 5/5 | 0.0300 ± 0.0003 | 0.0314 ± 0.0005 | 1.05 |
+| 1 | 1 | 1 | 20 | 500 | 500 | cond | 5/5 | 0.0353 ± 0.0015 | 0.0063 ± 0.0004 | 0.18 |
+| 2 | 6 | 2 | 100 | 200 | 500 | atomic | 5/5 | 0.1734 ± 0.0133 | 0.9955 ± 0.0929 | 5.74 |
+| 2 | 6 | 2 | 100 | 200 | 500 | cond | 5/5 | 0.3209 ± 0.0095 | 0.1918 ± 0.0125 | 0.60 |
+| 3 | 2 | 6 | 100 | 500 | 200 | atomic | 5/5 | 0.3260 ± 0.0664 | 1.7764 ± 0.4577 | 5.41 |
+| 3 | 2 | 6 | 100 | 500 | 200 | cond | 5/5 | 0.3892 ± 0.0511 | 0.1212 ± 0.0336 | 0.31 |
+| 4 | 8 | 8 | 10000 | 0 | 0 | atomic | 5/5 | 0.0426 ± 0.0203 | 0.2865 ± 0.1647 | 6.55 |
+| 4 | 8 | 8 | 10000 | 0 | 0 | cond | 5/5 | 4.3191 ± 0.1946 | 7.9045 ± 0.9108 | 1.83 |
+| 5 | 8 | 1 | 200 | 1000 | 100 | atomic | 5/5 | 0.4309 ± 0.0104 | 1.4123 ± 0.0643 | 3.28 |
+| 5 | 8 | 1 | 200 | 1000 | 100 | cond | 5/5 | 0.6390 ± 0.0536 | 0.4138 ± 0.0917 | 0.64 |
 
 ## Esperas por solicitud (µs, desde antes de `entrar_*()` hasta su retorno)
 
-| Caso | Variante | Lectura media | Lectura máx. | Escritura media | Escritura máx. | Máx. lectoras |
+Media: promedio de las medias por ejecución. Máx.: promedio de los máximos por ejecución (el mayor valor individual está en `e2.csv`).
+
+| Caso | Variante | Lectura media | Lectura: prom. de máximos | Escritura media | Escritura: prom. de máximos | Máx. lectoras (prom.) |
 |---|---|---|---|---|---|---|
-| 1 | atomic | 718.7 | 1103.4 | 740.7 | 1026.8 | 1.0 |
-| 1 | cond | 863.6 | 17255.5 | 34.2 | 662.0 | 1.0 |
-| 2 | atomic | 1808.2 | 148613.1 | 891.0 | 11006.8 | 6.0 |
-| 2 | cond | 2419.6 | 126969.4 | 683.6 | 84618.5 | 6.0 |
-| 3 | atomic | 3335.9 | 331737.6 | 2600.7 | 32712.1 | 2.0 |
-| 3 | cond | 2517.2 | 218476.3 | 1046.3 | 199246.6 | 2.0 |
-| 4 | atomic | 2.8 | 21412.7 | 1.4 | 3639.6 | 6.0 |
-| 4 | cond | 411.5 | 4055020.8 | 356.5 | 15036.0 | 4.0 |
-| 5 | atomic | 1557.5 | 32898.1 | 1721.2 | 9243.8 | 8.0 |
-| 5 | cond | 1770.4 | 116991.5 | 1242.6 | 1938.4 | 8.0 |
+| 1 | atomic | 698.7 | 1038.3 | 716.4 | 925.8 | 1.0 |
+| 1 | cond | 865.2 | 17283.7 | 44.8 | 876.0 | 1.0 |
+| 2 | atomic | 1385.4 | 136718.2 | 704.3 | 5730.2 | 6.0 |
+| 2 | cond | 2786.3 | 124374.3 | 776.9 | 96512.2 | 6.0 |
+| 3 | atomic | 2555.1 | 253623.4 | 2051.1 | 18251.3 | 2.0 |
+| 3 | cond | 3036.8 | 282295.0 | 1224.8 | 244908.0 | 2.0 |
+| 4 | atomic | 3.2 | 25705.7 | 1.6 | 2861.4 | 6.2 |
+| 4 | cond | 427.9 | 4220413.8 | 370.8 | 14254.2 | 4.6 |
+| 5 | atomic | 773.2 | 17007.5 | 1337.3 | 4693.3 | 8.0 |
+| 5 | cond | 1722.6 | 98514.9 | 1243.3 | 1931.3 | 8.0 |
 
 ## Fallos de admisión del modo atómico (promedio por ejecución)
 
 | Caso | Recurso ocupado | Escritoras esperando | CAS fallido |
 |---|---|---|---|
-| 1 | 23976 | 57 | 0 |
-| 2 | 897238 | 131420 | 69 |
-| 3 | 1900913 | 1803 | 230 |
-| 4 | 55770 | 32914 | 120270 |
-| 5 | 911131 | 1426125 | 1000 |
+| 1 | 24273 | 29 | 0 |
+| 2 | 778610 | 18815 | 45 |
+| 3 | 1476783 | 1040 | 304 |
+| 4 | 60150 | 36160 | 133450 |
+| 5 | 398794 | 354496 | 1563 |
 
 ## Razón atomic / cond
 
@@ -50,8 +52,12 @@ Valores mayores que 1 indican que la variante atómica tarda o consume más.
 
 | Caso | Pared | CPU | Espera escritura media | Espera lectura media |
 |---|---|---|---|---|
-| 1 | 0.92 | 5.05 | 21.69 | 0.83 |
-| 2 | 0.76 | 7.38 | 1.30 | 0.75 |
-| 3 | 1.24 | 28.24 | 2.49 | 1.33 |
+| 1 | 0.85 | 5.03 | 16.01 | 0.81 |
+| 2 | 0.54 | 5.19 | 0.91 | 0.50 |
+| 3 | 0.84 | 14.66 | 1.67 | 0.84 |
 | 4 | 0.01 | 0.04 | 0.00 | 0.01 |
-| 5 | 0.93 | 6.48 | 1.39 | 0.88 |
+| 5 | 0.67 | 3.41 | 1.08 | 0.45 |
+
+## Ejecuciones no válidas
+
+Ninguna.

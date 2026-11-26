@@ -4,9 +4,9 @@ $ /mnt/c/Users/joaqu/Tarea-2-SO-lectura-escritura-sincronizada/rw cond fifo 8 1 
 modo=cond politica=fifo L=8 E=1 K=200 dur_lec_us=1000 dur_esc_us=100
 hebras_creadas=9 operaciones_previstas=1800 operaciones_realizadas=1800 lecturas=1600 escrituras=200
 version_final=200 doble_version_final=400 inconsistencias=0 violaciones_exclusion=0 diagnostico_vacio=SI max_lectoras=8
-pared_s=0.627372 cpu_s=0.819347 fuente_cpu=CLOCK_PROCESS_CPUTIME_ID
-solicitudes_lectura=1600 espera_lectura_media_us=1839.657433 espera_lectura_max_us=3598.600000
-solicitudes_escritura=200 espera_escritura_media_us=2689.951160 espera_escritura_max_us=4099.101000
+pared_s=1.396162 cpu_s=2.367899 fuente_cpu=CLOCK_PROCESS_CPUTIME_ID
+solicitudes_lectura=1600 espera_lectura_media_us=5117.239544 espera_lectura_max_us=10744.096000
+solicitudes_escritura=200 espera_escritura_media_us=6131.333080 espera_escritura_max_us=11105.595000
 fallos_aplican=NO fallos_recurso_ocupado=0 fallos_escritoras_esperando=0 fallos_cas=0 fallos_saturados=NO
-r2_ok=SI correcto=SI traza=activa politica_ok=SI evidencia=1399
+r2_ok=SI correcto=SI traza=activa politica_ok=SI evidencia=1385
 # --- stderr
