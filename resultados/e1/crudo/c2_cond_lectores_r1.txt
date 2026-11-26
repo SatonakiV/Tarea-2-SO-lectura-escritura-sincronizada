@@ -1,0 +1,12 @@
+$ /mnt/c/Users/joaqu/Tarea-2-SO-lectura-escritura-sincronizada/rw cond lectores 6 2 100 200 500
+# codigo_salida=0
+# --- stdout
+modo=cond politica=lectores L=6 E=2 K=100 dur_lec_us=200 dur_esc_us=500
+hebras_creadas=8 operaciones_previstas=800 operaciones_realizadas=800 lecturas=600 escrituras=200
+version_final=200 doble_version_final=400 inconsistencias=0 violaciones_exclusion=0 diagnostico_vacio=SI max_lectoras=6
+pared_s=0.217543 cpu_s=0.046252 fuente_cpu=CLOCK_PROCESS_CPUTIME_ID
+solicitudes_lectura=600 espera_lectura_media_us=4.804333 espera_lectura_max_us=571.100000
+solicitudes_escritura=200 espera_escritura_media_us=788.353545 espera_escritura_max_us=122463.307000
+fallos_aplican=NO fallos_recurso_ocupado=0 fallos_escritoras_esperando=0 fallos_cas=0 fallos_saturados=NO
+r2_ok=SI correcto=SI traza=activa politica_ok=SI evidencia=592
+# --- stderr

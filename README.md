@@ -77,3 +77,18 @@ make test TEST_TIMEOUT=120s
 
 Al vencer el límite se solicita la terminación; si el proceso no termina en otros
 5 segundos, se fuerza su cierre. La ejecución de pruebas devuelve un error.
+
+## Experimentos
+
+```sh
+make experimentos   # E1 (100 ejecuciones), E2 (50 ejecuciones) y gráficos
+make e1             # solo E1
+make e2             # solo E2
+```
+
+Cada corrida se guarda en una carpeta nueva, `material-local/experimentos/<fecha-hora>/`,
+con la salida original de cada ejecución, CSV, promedios, resúmenes en Markdown y
+gráficos de E2 (requiere `matplotlib`). La medición que cita el informe está en
+`resultados/` y no se sobrescribe. `make experimentos` ejecuta los pasos en orden,
+también con `make -j`, y se detiene antes de E2 si E1 detecta un fallo. Para una
+prueba rápida: `make experimentos REPS=1`. El detalle está en `readme.txt`.
